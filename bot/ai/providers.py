@@ -1,9 +1,12 @@
+import logging
 from enum import Enum
 
 from ai_sdk import anthropic as _ant
 from ai_sdk import openai as _oai
 
 from bot.config import settings
+
+logger = logging.getLogger(__name__)
 
 _OPENCODEGO_BASE = "https://opencode.ai/zen/go/v1"
 _OPENCODEZEN_BASE = "https://opencode.ai/zen/v1"
@@ -37,6 +40,7 @@ def _resolve_protocol(model_id: str, prefix_map: list[tuple[str, Protocol]]) -> 
 
 
 def _make_model(model_id: str, protocol: Protocol, base_url: str, api_key: str):
+    logger.debug("_make_model: model_id=%r protocol=%s base_url=%r", model_id, protocol.value, base_url)
     if protocol == Protocol.ANTHROPIC:
         return _ant(model_id, base_url=base_url, api_key=api_key)
     if protocol == Protocol.GOOGLE:
@@ -84,6 +88,7 @@ def get_default_model():
     """Instantiate the default model from AI_PROVIDER and AI_MODEL env vars."""
     provider = settings.ai_provider.lower()
     model_id = settings.ai_model
+    logger.debug("get_default_model: provider=%r model_id=%r", provider, model_id)
     if provider == "opencodego":
         return opencodego(model_id)
     if provider == "opencodezen":

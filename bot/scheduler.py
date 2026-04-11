@@ -39,4 +39,6 @@ def get_bot() -> Bot:
 async def _run_scheduled_job(user_id: int, query: str) -> None:
     """Fired by APScheduler when a job is due. Runs an isolated AI query and sends the result."""
     from bot.ai.chat import run_scheduled_query  # late import — avoids circular at module level
+    logger.debug("_run_scheduled_job: fired for user=%d query=%r", user_id, query)
     await run_scheduled_query(user_id, query)
+    logger.debug("_run_scheduled_job: completed for user=%d", user_id)

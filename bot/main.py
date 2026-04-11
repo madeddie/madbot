@@ -34,8 +34,9 @@ def create_dispatcher() -> Dispatcher:
 
 
 async def _main() -> None:
+    log_level = logging.DEBUG if settings.debug else logging.INFO
     logging.basicConfig(
-        level=logging.INFO,
+        level=log_level,
         stream=sys.stdout,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )

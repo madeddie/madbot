@@ -58,6 +58,7 @@ def _trim(user_id: int) -> None:
 
 async def chat(user_id: int, user_message: str) -> str:
     """Send a message and return the assistant reply, maintaining per-user history."""
+    logger.debug("chat: user=%d message=%r history_len=%d", user_id, user_message, len(_history[user_id]))
     _history[user_id].append(CoreUserMessage(content=user_message))
     _trim(user_id)
 
@@ -69,6 +70,7 @@ async def chat(user_id: int, user_message: str) -> str:
         tools=_get_tools_for_user(user_id) or None,
     )
 
+    logger.debug("chat: user=%d tool_calls=%r reply=%r", user_id, getattr(result, "tool_calls", None), result.text)
     reply = result.text
     _history[user_id].append(CoreAssistantMessage(content=reply))
     _trim(user_id)
@@ -84,6 +86,8 @@ async def run_scheduled_query(user_id: int, query: str) -> None:
     """
     from bot.scheduler import get_bot  # late import — avoids circular at module level
 
+    logger.debug("run_scheduled_query: user=%d query=%r", user_id, query)
+
     system = settings.system_prompt + (
         "\n\nThis is a scheduled message triggered automatically. "
         "Respond naturally as if you initiated the conversation."
@@ -96,6 +100,8 @@ async def run_scheduled_query(user_id: int, query: str) -> None:
         messages=[CoreUserMessage(content=query)],
         tools=_get_tools_for_user(user_id) or None,
     )
+
+    logger.debug("run_scheduled_query: user=%d tool_calls=%r reply=%r", user_id, getattr(result, "tool_calls", None), result.text)
 
     bot = get_bot()
     try:

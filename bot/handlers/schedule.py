@@ -43,6 +43,10 @@ def schedule_once(user_id: int, query: str, delay_seconds: int) -> str:
     from apscheduler.triggers.date import DateTrigger
 
     run_time = datetime.now(timezone.utc) + timedelta(seconds=delay_seconds)
+    logger.debug(
+        "schedule_once: user=%d delay=%ds run_time=%s query=%r",
+        user_id, delay_seconds, run_time.isoformat(), query,
+    )
     scheduler = get_scheduler()
     job = scheduler.add_job(
         _run_scheduled_job,
@@ -50,6 +54,7 @@ def schedule_once(user_id: int, query: str, delay_seconds: int) -> str:
         kwargs={"user_id": user_id, "query": query},
         name=f"once:{user_id}:{query[:40]}",
     )
+    logger.debug("schedule_once: job_id=%s next_run=%s", job.id, job.next_run_time)
     minutes, secs = divmod(delay_seconds, 60)
     human = f"{minutes}m {secs}s" if minutes else f"{secs}s"
     return f"Scheduled in {human} (job ID: <code>{job.id}</code>)."
@@ -66,6 +71,11 @@ def schedule_recurring(
     except ZoneInfoNotFoundError:
         return f"Unknown timezone '{timezone}'. Use an IANA name like 'America/New_York'."
 
+    logger.debug(
+        "schedule_recurring: user=%d cron=%r timezone=%r query=%r",
+        user_id, cron_expression, timezone, query,
+    )
+
     try:
         trigger = CronTrigger.from_crontab(cron_expression, timezone=tz)
     except ValueError as exc:
@@ -77,6 +87,10 @@ def schedule_recurring(
         trigger=trigger,
         kwargs={"user_id": user_id, "query": query},
         name=f"cron:{user_id}:{query[:40]}",
+    )
+    logger.debug(
+        "schedule_recurring: job_id=%s next_run=%s trigger=%s",
+        job.id, job.next_run_time, trigger,
     )
     return (
         f"Recurring job created (job ID: <code>{job.id}</code>).\n"

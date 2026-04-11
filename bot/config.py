@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     system_prompt: str = "You are a helpful assistant."
     max_history_messages: int = Field(default=20, ge=1, le=200)
     scheduler_db_path: str = Field(default="scheduler.db")
+    debug: bool = Field(default=False)
 
 
 settings = Settings()
