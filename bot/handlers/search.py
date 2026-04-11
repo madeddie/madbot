@@ -4,18 +4,27 @@ Scrapes https://html.duckduckgo.com/html, no API key required.
 """
 
 import re
+from http.cookiejar import CookieJar
 from urllib.error import URLError
-from urllib.parse import parse_qs, urlencode, urlparse
-from urllib.request import Request, urlopen
+from urllib.parse import parse_qs, quote_plus, urlencode, urlparse
+from urllib.request import HTTPCookieProcessor, Request, build_opener
 
 from ai_sdk import tool as ai_tool
 from pydantic import BaseModel, Field
 
 _DDG_ENDPOINT = "https://html.duckduckgo.com/html"
-_USER_AGENT = (
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-)
+_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.5",
+    "Accept-Encoding": "identity",
+    "Referer": "https://duckduckgo.com/",
+    "Origin": "https://duckduckgo.com",
+}
+_opener = build_opener(HTTPCookieProcessor(CookieJar()))
 
 _HTML_ENTITIES = {
     "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"',
@@ -102,19 +111,20 @@ class _SearchParams(BaseModel):
 
 
 def _search(query: str, count: int = 5) -> str:
-    params = urlencode({"q": query, "kp": "-1"})  # kp=-1 = moderate safe search
-    req = Request(
-        f"{_DDG_ENDPOINT}?{params}",
-        headers={"User-Agent": _USER_AGENT},
-    )
+    body = urlencode({"q": query, "kp": "-1"}).encode()  # kp=-1 = moderate safe search
+    req = Request(_DDG_ENDPOINT, data=body, headers=_HEADERS)
     try:
-        with urlopen(req, timeout=20) as resp:
+        with _opener.open(req, timeout=20) as resp:
             html = resp.read().decode("utf-8")
     except URLError as e:
         return f"Web search failed: {e.reason}"
 
     if _is_bot_challenge(html):
-        return "Web search unavailable: DuckDuckGo returned a bot-detection challenge."
+        encoded_q = quote_plus(query)
+        return (
+            "Web search unavailable: DuckDuckGo returned a bot-detection challenge. "
+            f"Search manually: https://duckduckgo.com/?q={encoded_q}"
+        )
 
     results = _parse_ddg_html(html, count)
     if not results:
