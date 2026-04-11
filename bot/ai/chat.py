@@ -1,5 +1,6 @@
 import asyncio
 import importlib
+import logging
 import pkgutil
 from collections import defaultdict
 
@@ -11,30 +12,42 @@ from ai_sdk.types import AnyMessage, CoreAssistantMessage, CoreUserMessage
 from bot.ai.providers import get_default_model
 from bot.config import settings
 
+logger = logging.getLogger(__name__)
+
 _model = get_default_model()
 
 # Per-user conversation history keyed by Telegram user_id.
 # In-memory only — resets on bot restart.
 _history: dict[int, list[AnyMessage]] = defaultdict(list)
 
+# Static tools (from AI_TOOLS lists) collected once and cached.
+_static_tools: list[Tool] | None = None
+# Factory callables (make_schedule_tools) — one per handler module that exports one.
+_tool_factories: list | None = None
 
-def _collect_tools() -> list[Tool]:
-    tools: list[Tool] = []
+
+def _collect_tools_once() -> tuple[list[Tool], list]:
+    """Scan handler modules and collect static tools and per-user tool factories."""
+    static: list[Tool] = []
+    factories = []
     for mod_info in pkgutil.iter_modules(_handlers_pkg.__path__):
         mod = importlib.import_module(f"bot.handlers.{mod_info.name}")
         if hasattr(mod, "AI_TOOLS"):
-            tools.extend(mod.AI_TOOLS)
+            static.extend(mod.AI_TOOLS)
+        if hasattr(mod, "make_schedule_tools"):
+            factories.append(mod.make_schedule_tools)
+    return static, factories
+
+
+def _get_tools_for_user(user_id: int) -> list[Tool]:
+    """Return the full tool list for a given user (static tools + user-bound dynamic tools)."""
+    global _static_tools, _tool_factories
+    if _static_tools is None or _tool_factories is None:
+        _static_tools, _tool_factories = _collect_tools_once()
+    tools = list(_static_tools)
+    for factory in _tool_factories:
+        tools.extend(factory(user_id))
     return tools
-
-
-_tools: list[Tool] | None = None
-
-
-def _get_tools() -> list[Tool]:
-    global _tools
-    if _tools is None:
-        _tools = _collect_tools()
-    return _tools
 
 
 def _trim(user_id: int) -> None:
@@ -53,7 +66,7 @@ async def chat(user_id: int, user_message: str) -> str:
         model=_model,
         system=settings.system_prompt,
         messages=list(_history[user_id]),
-        tools=_get_tools() or None,
+        tools=_get_tools_for_user(user_id) or None,
     )
 
     reply = result.text
@@ -61,6 +74,34 @@ async def chat(user_id: int, user_message: str) -> str:
     _trim(user_id)
 
     return reply
+
+
+async def run_scheduled_query(user_id: int, query: str) -> None:
+    """Execute an AI query for a scheduled job.
+
+    Runs an isolated single-turn conversation (does not touch _history).
+    Sends the result to the user via the bot.
+    """
+    from bot.scheduler import get_bot  # late import — avoids circular at module level
+
+    system = settings.system_prompt + (
+        "\n\nThis is a scheduled message triggered automatically. "
+        "Respond naturally as if you initiated the conversation."
+    )
+
+    result = await asyncio.to_thread(
+        generate_text,
+        model=_model,
+        system=system,
+        messages=[CoreUserMessage(content=query)],
+        tools=_get_tools_for_user(user_id) or None,
+    )
+
+    bot = get_bot()
+    try:
+        await bot.send_message(user_id, result.text)
+    except Exception:
+        logger.exception("Failed to send scheduled message to user %d", user_id)
 
 
 def clear_history(user_id: int) -> None:

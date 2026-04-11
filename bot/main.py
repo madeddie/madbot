@@ -44,6 +44,10 @@ async def _main() -> None:
         token=settings.telegram_bot_token,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
+
+    from bot import scheduler as _scheduler_mod
+    _scheduler_mod.init(bot)
+
     dp = create_dispatcher()
 
     logger.info(
@@ -54,6 +58,7 @@ async def _main() -> None:
     try:
         await dp.start_polling(bot, drop_pending_updates=True)
     finally:
+        _scheduler_mod.get_scheduler().shutdown(wait=False)
         await bot.session.close()
 
 
