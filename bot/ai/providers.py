@@ -21,9 +21,10 @@ class Protocol(Enum):
 
 # Zen: checked in order, first prefix match wins; unmatched → OPENAI_CHAT
 _ZEN_PREFIX_MAP: list[tuple[str, Protocol]] = [
-    ("claude-", Protocol.ANTHROPIC),
-    ("gpt-",    Protocol.OPENAI_RESPONSES),
-    ("gemini-", Protocol.GOOGLE),
+    ("claude-",   Protocol.ANTHROPIC),
+    ("gpt-",      Protocol.OPENAI_RESPONSES),
+    ("gemini-",   Protocol.GOOGLE),
+    ("minimax-",  Protocol.OPENAI_CHAT),
 ]
 
 # Go: checked in order, first prefix match wins; unmatched → OPENAI_CHAT
@@ -76,6 +77,7 @@ def opencodezen(model_id: str):
       claude-*   → Anthropic-compatible (/messages)
       gpt-*      → OpenAI responses (/responses)
       gemini-*   → Google protocol (not yet supported)
+      minimax-*  → OpenAI-compatible (/chat/completions)
       everything else → OpenAI-compatible (/chat/completions)
 
     Usage: model = opencodezen("claude-sonnet-4-6")
