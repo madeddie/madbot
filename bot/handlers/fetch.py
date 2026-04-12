@@ -63,7 +63,10 @@ def _fetch_webpage(url: str) -> str:
     try:
         with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
             content_type = resp.headers.get_content_type()
-            if content_type and not content_type.startswith("text/"):
+            _XML_TYPES = ("application/rss+xml", "application/atom+xml", "application/xml")
+            if content_type and not (
+                content_type.startswith("text/") or content_type in _XML_TYPES
+            ):
                 return (
                     f"Error: cannot extract text from non-text content "
                     f"(content-type: {content_type})."
