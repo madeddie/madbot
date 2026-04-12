@@ -55,10 +55,9 @@ def _build_briefing_query(user_id: int) -> str:
 
     if "news" in sections:
         parts.append(
-            f"{step}. Call web_search with query 'site:apnews.com OR site:reuters.com latest' "
-            "to find today's top news articles. Present the results as a numbered list of "
-            "headlines using the article titles from the search results — do not list URLs or "
-            "news site names."
+            f"{step}. Call fetch_webpage with URL 'https://feeds.apnews.com/rss/topnews' to get "
+            "today's top news headlines. The response is an RSS feed — extract the article "
+            "titles and present them as a numbered list of headlines."
         )
         step += 1
 
