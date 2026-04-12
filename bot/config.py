@@ -20,5 +20,9 @@ class Settings(BaseSettings):
     db_path: str = Field(default="madbot.db")
     debug: bool = Field(default=False)
 
+    amazon_username: str = ""
+    amazon_password: str = ""
+    amazon_otp_secret: str = ""
+
 
 settings = Settings()
