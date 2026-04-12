@@ -55,7 +55,7 @@ def _build_briefing_query(user_id: int) -> str:
 
     if "news" in sections:
         parts.append(
-            f"{step}. Call get_news_headlines to fetch today's top headlines from AP News and Reuters. "
+            f"{step}. Call get_news_headlines to fetch today's top headlines from AP News and BBC News. "
             "Present the results as a numbered list under a News section."
         )
         step += 1
