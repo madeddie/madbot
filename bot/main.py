@@ -59,6 +59,13 @@ async def _main() -> None:
         settings.ai_provider,
         settings.ai_model,
     )
+
+    async def _on_startup(bot: Bot, **kwargs) -> None:
+        if settings.owner_chat_id:
+            await bot.send_message(settings.owner_chat_id, "madbot is online.")
+
+    dp.startup.register(_on_startup)
+
     try:
         await dp.start_polling(bot, drop_pending_updates=True)
     finally:
