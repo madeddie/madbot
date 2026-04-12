@@ -73,6 +73,19 @@ def _trim(user_id: int) -> None:
         _history[user_id] = _history[user_id][-max_msgs:]
 
 
+async def one_shot(user_id: int, query: str, extra_system: str = "") -> str:
+    """Isolated single-turn AI call. No history read/write. Returns reply text."""
+    result = await asyncio.to_thread(
+        generate_text,
+        model=_model,
+        system=_build_system(user_id, extra=extra_system),
+        messages=[CoreUserMessage(content=query)],
+        tools=_get_tools_for_user(user_id) or None,
+    )
+    logger.debug("one_shot: user=%d tool_calls=%r reply=%r", user_id, getattr(result, "tool_calls", None), result.text)
+    return result.text
+
+
 async def chat(user_id: int, user_message: str) -> str:
     """Send a message and return the assistant reply, maintaining per-user history."""
     logger.debug("chat: user=%d message=%r history_len=%d", user_id, user_message, len(_history[user_id]))
@@ -105,23 +118,14 @@ async def run_scheduled_query(user_id: int, query: str) -> None:
 
     logger.debug("run_scheduled_query: user=%d query=%r", user_id, query)
 
-    system = _build_system(
+    reply = await one_shot(
         user_id,
-        extra=(
+        query,
+        extra_system=(
             "This is a scheduled message triggered automatically. "
             "Respond naturally as if you initiated the conversation."
         ),
     )
-
-    result = await asyncio.to_thread(
-        generate_text,
-        model=_model,
-        system=system,
-        messages=[CoreUserMessage(content=query)],
-        tools=_get_tools_for_user(user_id) or None,
-    )
-
-    logger.debug("run_scheduled_query: user=%d tool_calls=%r reply=%r", user_id, getattr(result, "tool_calls", None), result.text)
 
     from aiogram.enums import ParseMode
 
@@ -129,7 +133,7 @@ async def run_scheduled_query(user_id: int, query: str) -> None:
 
     bot = get_bot()
     try:
-        await bot.send_message(user_id, md_to_tg(result.text), parse_mode=ParseMode.MARKDOWN_V2)
+        await bot.send_message(user_id, md_to_tg(reply), parse_mode=ParseMode.MARKDOWN_V2)
     except Exception:
         logger.exception("Failed to send scheduled message to user %d", user_id)
 
