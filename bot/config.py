@@ -22,6 +22,8 @@ class Settings(BaseSettings):
 
     owner_chat_id: int = Field(default=0)
 
+    log_file: str = Field(default="", description="Path to log file; empty disables file logging.")
+
     amazon_username: str = ""
     amazon_password: str = ""
     amazon_otp_secret: str = ""

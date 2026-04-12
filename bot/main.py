@@ -3,6 +3,7 @@ import importlib
 import logging
 import pkgutil
 import sys
+from datetime import datetime, timezone
 
 import bot.handlers as _handlers_pkg
 from aiogram import Bot, Dispatcher
@@ -12,6 +13,8 @@ from aiogram.enums import ParseMode
 from bot.config import settings
 
 logger = logging.getLogger(__name__)
+
+start_time: datetime = datetime.now(timezone.utc)
 
 
 def create_dispatcher() -> Dispatcher:
@@ -35,11 +38,17 @@ def create_dispatcher() -> Dispatcher:
 
 async def _main() -> None:
     log_level = logging.DEBUG if settings.debug else logging.INFO
+    log_fmt = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
     logging.basicConfig(
         level=log_level,
         stream=sys.stdout,
-        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        format=log_fmt,
     )
+    if settings.log_file:
+        file_handler = logging.FileHandler(settings.log_file)
+        file_handler.setFormatter(logging.Formatter(log_fmt))
+        file_handler.setLevel(log_level)
+        logging.getLogger().addHandler(file_handler)
 
     bot = Bot(
         token=settings.telegram_bot_token,
