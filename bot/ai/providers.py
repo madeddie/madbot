@@ -1,6 +1,7 @@
 import logging
 from enum import Enum
 
+import openai as _openai_lib
 from ai_sdk import anthropic as _ant
 from ai_sdk import openai as _oai
 
@@ -48,9 +49,13 @@ def _make_model(model_id: str, protocol: Protocol, base_url: str, api_key: str):
         raise NotImplementedError(
             f"Gemini models ({model_id!r}) require Google SDK support — not yet wired up."
         )
-    # OPENAI_CHAT and OPENAI_RESPONSES both use the openai factory;
-    # ai_sdk routes to /chat/completions or /responses based on the model name.
-    return _oai(model_id, base_url=base_url, api_key=api_key)
+    # OPENAI_CHAT and OPENAI_RESPONSES both use the openai factory.
+    # ai_sdk's openai() doesn't accept base_url as a named param — passing it
+    # causes it to leak into **default_kwargs and then into completions.create(),
+    # which rejects it.  Build without base_url and patch the client directly.
+    model = _oai(model_id, api_key=api_key)
+    model._client = _openai_lib.OpenAI(base_url=base_url, api_key=api_key)
+    return model
 
 
 def opencodego(model_id: str):
