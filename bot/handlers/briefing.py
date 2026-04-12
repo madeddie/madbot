@@ -5,8 +5,6 @@ from aiogram import Router
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
 from aiogram.types import Message
-from pydantic import BaseModel, Field
-
 from bot import db
 from bot.utils import md_to_tg
 
@@ -80,40 +78,47 @@ def _build_briefing_query(user_id: int) -> str:
 
 # ---- Configure briefing tool ----
 
-class _ConfigureBriefingParams(BaseModel):
-    location: str | None = Field(
-        default=None,
-        description="City for weather in the briefing, e.g. 'London'. Omit to leave unchanged.",
-    )
-    sections: str | None = Field(
-        default=None,
-        description=(
-            "Comma-separated list of sections to include. "
-            "Valid values: weather, time, news, schedules, orders. "
-            "Example: 'weather,time,schedules'. Omit to leave unchanged."
-        ),
-    )
-    timezone: str | None = Field(
-        default=None,
-        description="IANA timezone for displaying times, e.g. 'America/New_York'. Omit to leave unchanged.",
-    )
+# Plain dict schema: all fields are optional plain strings (no null).
+# Using str | None / anyOf:[string,null] confuses some models into passing null.
+_CONFIGURE_BRIEFING_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "location": {
+            "type": "string",
+            "description": "City for weather in the briefing, e.g. 'London'. Omit to leave unchanged.",
+        },
+        "sections": {
+            "type": "string",
+            "description": (
+                "Comma-separated list of sections to include. "
+                "Valid values: weather, time, news, schedules, orders. "
+                "Example: 'weather,time,schedules'. Omit to leave unchanged."
+            ),
+        },
+        "timezone": {
+            "type": "string",
+            "description": "IANA timezone for displaying times, e.g. 'America/New_York'. Omit to leave unchanged.",
+        },
+    },
+    "required": [],
+}
 
 
 def make_briefing_tools(user_id: int) -> list:
     """Return AI tools for configuring the briefing, with user_id pre-bound."""
 
     def _do_configure_briefing(
-        location: str | None = None,
-        sections: str | None = None,
-        timezone: str | None = None,
+        location: str = "",
+        sections: str = "",
+        timezone: str = "",
     ) -> str:
         changed = []
 
-        if location is not None:
+        if location:
             db.set_fact(user_id, _KEY_LOCATION, location)
             changed.append(f"location → {location!r}")
 
-        if sections is not None:
+        if sections:
             requested = [s.strip() for s in sections.split(",") if s.strip()]
             invalid = [s for s in requested if s not in _VALID_SECTIONS]
             valid = [s for s in requested if s in _VALID_SECTIONS]
@@ -125,14 +130,13 @@ def make_briefing_tools(user_id: int) -> list:
             db.set_fact(user_id, _KEY_SECTIONS, ",".join(valid))
             changed.append(f"sections → {', '.join(valid)}")
 
-        if timezone is not None:
+        if timezone:
             db.set_fact(user_id, _KEY_TIMEZONE, timezone)
             changed.append(f"timezone → {timezone!r}")
 
         if not changed:
             return "No changes were specified."
 
-        # Return current full config as confirmation
         facts = db.get_facts(user_id)
         current_location = facts.get(_KEY_LOCATION, "(not set)")
         current_sections = facts.get(_KEY_SECTIONS, _DEFAULT_SECTIONS)
@@ -153,7 +157,7 @@ def make_briefing_tools(user_id: int) -> list:
                 "'include news in my daily briefing'. "
                 "Pass only the fields the user mentioned."
             ),
-            parameters=_ConfigureBriefingParams,
+            parameters=_CONFIGURE_BRIEFING_SCHEMA,
             execute=_do_configure_briefing,
         )
     ]
