@@ -46,6 +46,9 @@ async def _main() -> None:
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
 
+    from bot import db as _db_mod
+    _db_mod.init()
+
     from bot import scheduler as _scheduler_mod
     _scheduler_mod.init(bot)
 

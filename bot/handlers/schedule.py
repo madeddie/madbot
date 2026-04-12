@@ -8,6 +8,8 @@ from aiogram.filters import Command
 from aiogram.types import Message
 from pydantic import BaseModel, Field
 
+from bot import db
+
 router = Router()
 logger = logging.getLogger(__name__)
 
@@ -107,11 +109,11 @@ def list_schedules(user_id: int) -> str:
         return "You have no active scheduled jobs."
     lines = ["<b>Your scheduled jobs:</b>"]
     for job in jobs:
-        next_run = (
-            job.next_run_time.strftime("%Y-%m-%d %H:%M UTC")
-            if job.next_run_time
-            else "paused"
-        )
+        tz_str = str(getattr(getattr(job, "trigger", None), "timezone", None) or "UTC")
+        if job.next_run_time:
+            next_run = f"{job.next_run_time.strftime('%Y-%m-%d %H:%M')} ({tz_str})"
+        else:
+            next_run = "paused"
         lines.append(
             f"• <code>{job.id}</code>\n"
             f"  Next: {next_run}\n"
@@ -138,6 +140,8 @@ def cancel_schedule(user_id: int, job_id: str) -> str:
 
 def make_schedule_tools(user_id: int) -> list:
     """Return AI tools with user_id pre-bound via closures."""
+    facts = db.get_facts(user_id)
+    user_tz = facts.get("timezone", "UTC")
 
     def _do_schedule_once(query: str, delay_seconds: int) -> str:
         return schedule_once(user_id, query, delay_seconds)
@@ -167,7 +171,10 @@ def make_schedule_tools(user_id: int) -> list:
             name="schedule_recurring",
             description=(
                 "Schedule a recurring task using a cron expression. "
-                "Convert phrases like 'every morning at 9am' to cron_expression='0 9 * * *'."
+                f"Always pass a timezone. The user's stored timezone is '{user_tz}' — "
+                "use it as the default if the user doesn't specify one. "
+                "E.g. 'every evening at 8:50pm Eastern' → "
+                "cron_expression='50 20 * * *', timezone='America/New_York'."
             ),
             parameters=_ScheduleRecurringParams,
             execute=_do_schedule_recurring,

@@ -17,11 +17,11 @@ def init(bot: Bot) -> None:
     global _scheduler, _bot
     _bot = bot
     _scheduler = AsyncIOScheduler(
-        jobstores={"default": SQLAlchemyJobStore(url=f"sqlite:///{settings.scheduler_db_path}")},
+        jobstores={"default": SQLAlchemyJobStore(url=f"sqlite:///{settings.db_path}")},
         job_defaults={"misfire_grace_time": 60},
     )
     _scheduler.start()
-    logger.info("Scheduler started (db=%s)", settings.scheduler_db_path)
+    logger.info("Scheduler started (db=%s)", settings.db_path)
 
 
 def get_scheduler() -> AsyncIOScheduler:

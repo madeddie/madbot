@@ -9,6 +9,7 @@ from ai_sdk import generate_text
 from ai_sdk.tool import Tool
 from ai_sdk.types import AnyMessage, CoreAssistantMessage, CoreUserMessage
 
+from bot import db
 from bot.ai.providers import get_default_model
 from bot.config import settings
 
@@ -27,15 +28,19 @@ _tool_factories: list | None = None
 
 
 def _collect_tools_once() -> tuple[list[Tool], list]:
-    """Scan handler modules and collect static tools and per-user tool factories."""
+    """Scan handler modules and collect static tools and per-user tool factories.
+
+    A per-user tool factory is any module-level callable named make_*_tools.
+    """
     static: list[Tool] = []
     factories = []
     for mod_info in pkgutil.iter_modules(_handlers_pkg.__path__):
         mod = importlib.import_module(f"bot.handlers.{mod_info.name}")
         if hasattr(mod, "AI_TOOLS"):
             static.extend(mod.AI_TOOLS)
-        if hasattr(mod, "make_schedule_tools"):
-            factories.append(mod.make_schedule_tools)
+        for attr in dir(mod):
+            if attr.startswith("make_") and attr.endswith("_tools") and callable(getattr(mod, attr)):
+                factories.append(getattr(mod, attr))
     return static, factories
 
 
@@ -48,6 +53,18 @@ def _get_tools_for_user(user_id: int) -> list[Tool]:
     for factory in _tool_factories:
         tools.extend(factory(user_id))
     return tools
+
+
+def _build_system(user_id: int, extra: str = "") -> str:
+    """Return the system prompt, appending stored facts and any extra suffix."""
+    parts = [settings.system_prompt]
+    facts = db.get_facts(user_id)
+    if facts:
+        lines = "\n".join(f"- {k}: {v}" for k, v in facts.items())
+        parts.append(f"Known facts about the user:\n{lines}")
+    if extra:
+        parts.append(extra)
+    return "\n\n".join(parts)
 
 
 def _trim(user_id: int) -> None:
@@ -65,7 +82,7 @@ async def chat(user_id: int, user_message: str) -> str:
     result = await asyncio.to_thread(
         generate_text,
         model=_model,
-        system=settings.system_prompt,
+        system=_build_system(user_id),
         messages=list(_history[user_id]),
         tools=_get_tools_for_user(user_id) or None,
     )
@@ -88,9 +105,12 @@ async def run_scheduled_query(user_id: int, query: str) -> None:
 
     logger.debug("run_scheduled_query: user=%d query=%r", user_id, query)
 
-    system = settings.system_prompt + (
-        "\n\nThis is a scheduled message triggered automatically. "
-        "Respond naturally as if you initiated the conversation."
+    system = _build_system(
+        user_id,
+        extra=(
+            "This is a scheduled message triggered automatically. "
+            "Respond naturally as if you initiated the conversation."
+        ),
     )
 
     result = await asyncio.to_thread(
