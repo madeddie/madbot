@@ -123,9 +123,13 @@ async def run_scheduled_query(user_id: int, query: str) -> None:
 
     logger.debug("run_scheduled_query: user=%d tool_calls=%r reply=%r", user_id, getattr(result, "tool_calls", None), result.text)
 
+    from aiogram.enums import ParseMode
+
+    from bot.utils import md_to_tg
+
     bot = get_bot()
     try:
-        await bot.send_message(user_id, result.text)
+        await bot.send_message(user_id, md_to_tg(result.text), parse_mode=ParseMode.MARKDOWN_V2)
     except Exception:
         logger.exception("Failed to send scheduled message to user %d", user_id)
 

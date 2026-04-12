@@ -12,6 +12,7 @@ dependencies = [
     "sqlalchemy>=2.0",
     "tzdata",
     "amazon-orders>=4.0.18",
+    "telegramify-markdown>=0.1",
 ]
 
 [project.scripts]
