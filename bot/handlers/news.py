@@ -1,6 +1,6 @@
 """
 News headlines fetcher — AI tool only (no slash command).
-Scrapes AP News and Reuters frontpages and returns the top 5 headlines from each.
+Fetches AP News frontpage (SSR) and BBC News RSS feed for top 5 headlines each.
 """
 
 import re
@@ -20,6 +20,9 @@ _SKIP_TAGS = frozenset(
 _MIN_LEN = 20
 _MAX_LEN = 250
 
+_CDATA_RE = re.compile(r"<!\[CDATA\[(.*?)\]\]>", re.DOTALL)
+_TAG_RE = re.compile(r"<[^>]+>")
+
 _HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
@@ -32,7 +35,7 @@ _HEADERS = {
 
 _SOURCES = [
     ("AP News", "https://apnews.com"),
-    ("Reuters", "https://www.reuters.com"),
+    ("BBC News", "https://feeds.bbci.co.uk/news/rss.xml"),
 ]
 
 
@@ -71,18 +74,45 @@ class _HeadingsExtractor(HTMLParser):
                 self._current.append(stripped)
 
 
+def _parse_rss(content: str, limit: int) -> list[str]:
+    """Extract article titles from an RSS/Atom feed."""
+    items = re.findall(r"<item[^>]*>(.*?)</item>", content, re.DOTALL | re.IGNORECASE)
+    if not items:
+        items = re.findall(r"<entry[^>]*>(.*?)</entry>", content, re.DOTALL | re.IGNORECASE)
+    headlines: list[str] = []
+    for item in items:
+        m = re.search(r"<title[^>]*>(.*?)</title>", item, re.DOTALL | re.IGNORECASE)
+        if not m:
+            continue
+        title = _CDATA_RE.sub(r"\1", m.group(1)).strip()
+        title = re.sub(r"\s+", " ", _TAG_RE.sub("", title)).strip()
+        if _MIN_LEN <= len(title) <= _MAX_LEN:
+            headlines.append(title)
+        if len(headlines) >= limit:
+            break
+    return headlines
+
+
 def _fetch_headlines(url: str, limit: int = 5) -> list[str]:
     req = urllib.request.Request(url, headers=_HEADERS)
     try:
         with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
+            content_type = resp.headers.get_content_type() or ""
             raw_bytes = resp.read()
     except (urllib.error.URLError, urllib.error.HTTPError, Exception):
         return []
 
-    html = raw_bytes.decode("utf-8", errors="replace")
+    content = raw_bytes.decode("utf-8", errors="replace")
+
+    # RSS/Atom feed: parse <item><title> elements
+    _XML_TYPES = ("application/rss+xml", "application/atom+xml", "application/xml", "text/xml")
+    if content_type in _XML_TYPES or "<rss" in content[:500] or "<feed" in content[:500]:
+        return _parse_rss(content, limit)
+
+    # HTML: extract h1-h4 headings
     parser = _HeadingsExtractor()
     try:
-        parser.feed(html)
+        parser.feed(content)
     except Exception:
         return []
 
@@ -116,7 +146,7 @@ AI_TOOLS = [
     ai_tool(
         name="get_news_headlines",
         description=(
-            "Fetch the top 5 news headlines from AP News and Reuters frontpages. "
+            "Fetch the top 5 news headlines from AP News and BBC News. "
             "Returns a numbered list of today's top stories from each source. "
             "Use this for the news section of the daily briefing."
         ),
