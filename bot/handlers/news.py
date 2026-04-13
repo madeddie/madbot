@@ -35,7 +35,7 @@ _HEADERS = {
 
 _SOURCES = [
     ("AP News", "https://apnews.com"),
-    ("BBC News", "https://feeds.bbci.co.uk/news/rss.xml"),
+    ("BBC News", "https://feeds.bbci.co.uk/news/world/rss.xml"),
 ]
 
 
