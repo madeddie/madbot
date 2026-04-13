@@ -22,7 +22,6 @@ router = Router()
 COMMANDS = {"calendar": "Show upcoming calendar events — /calendar [days] [personal|business|all]"}
 
 _HTML_TAG_RE = re.compile(r"<[^>]+>")
-_GSHEET_ID_RE = re.compile(r"/spreadsheets/d/([^/]+)")
 
 
 # ---- Personal calendar (iCal) ----
@@ -65,17 +64,8 @@ def _get_personal_events(days: int) -> list[tuple[datetime, str]]:
 
 # ---- Business calendar (Google Sheet) ----
 
-def _gsheet_csv_url(url: str) -> str:
-    if "/export" in url:
-        return url
-    m = _GSHEET_ID_RE.search(url)
-    if not m:
-        raise ValueError(f"Cannot extract sheet ID from URL: {url!r}")
-    return f"https://docs.google.com/spreadsheets/d/{m.group(1)}/export?format=csv"
-
-
 def _get_business_events(days: int) -> list[tuple[datetime, str]]:
-    url = _gsheet_csv_url(settings.gsheet_calendar_url)
+    url = f"https://docs.google.com/spreadsheets/d/{settings.gsheet_calendar_id}/export?format=csv"
     req = Request(url, headers={"User-Agent": "madbot/1.0"})
     with urlopen(req, timeout=15) as resp:
         content = resp.read().decode("utf-8")
@@ -130,10 +120,10 @@ def _get_business_events(days: int) -> list[tuple[datetime, str]]:
 
 def _get_upcoming_events(days: int = 7, source: str = "all") -> str:
     has_personal = bool(settings.ical_url)
-    has_business = bool(settings.gsheet_calendar_url)
+    has_business = bool(settings.gsheet_calendar_id)
 
     if not has_personal and not has_business:
-        return "No calendar sources configured (set ICAL_URL and/or GSHEET_CALENDAR_URL)."
+        return "No calendar sources configured (set ICAL_URL and/or GSHEET_CALENDAR_ID)."
 
     want_personal = source in ("personal", "all") and has_personal
     want_business = source in ("business", "all") and has_business

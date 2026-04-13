@@ -120,6 +120,8 @@ All config lives in `bot/config.py` as a pydantic-settings `Settings` singleton.
 | `AMAZON_USERNAME` | no | `""` | Amazon login email |
 | `AMAZON_PASSWORD` | no | `""` | Amazon login password |
 | `AMAZON_OTP_SECRET` | no | `""` | Amazon TOTP secret (optional) |
+| `ICAL_URL` | no | `""` | Secret iCal URL for personal calendar |
+| `GSHEET_CALENDAR_ID` | no | `""` | Google Sheets spreadsheet ID for business calendar |
 
 ### Conversation history
 
