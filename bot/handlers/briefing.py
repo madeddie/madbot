@@ -72,7 +72,7 @@ def _build_briefing_query(user_id: int) -> str:
         from bot.config import settings as _settings
 
         has_personal = bool(_settings.ical_url)
-        has_business = bool(_settings.gsheet_calendar_url)
+        has_business = bool(_settings.gsheet_calendar_id)
         if has_personal or has_business:
             sources_desc = " and ".join(
                 (["personal iCal"] if has_personal else [])

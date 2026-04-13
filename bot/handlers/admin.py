@@ -1,4 +1,5 @@
 import asyncio
+import html
 import logging
 import os
 import sys
@@ -55,4 +56,4 @@ async def cmd_gitpull(message: Message) -> None:
     )
     stdout, _ = await proc.communicate()
     output = stdout.decode().strip()
-    await message.answer(f"<pre>{output}</pre>")
+    await message.answer(f"<pre>{html.escape(output)}</pre>")
