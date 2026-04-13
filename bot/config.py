@@ -28,5 +28,8 @@ class Settings(BaseSettings):
     amazon_password: str = ""
     amazon_otp_secret: str = ""
 
+    ical_url: str = Field(default="", description="Secret iCal URL for personal calendar access.")
+    gsheet_calendar_url: str = Field(default="", description="Public Google Sheets URL for business calendar.")
+
 
 settings = Settings()

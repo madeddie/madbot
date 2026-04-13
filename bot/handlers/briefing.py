@@ -16,7 +16,7 @@ COMMANDS = {"briefing": "Generate your personalised daily briefing"}
 _KEY_LOCATION = "briefing_location"
 _KEY_SECTIONS = "briefing_sections"
 _KEY_TIMEZONE = "briefing_timezone"
-_VALID_SECTIONS = {"weather", "time", "news", "schedules", "orders"}
+_VALID_SECTIONS = {"weather", "time", "news", "schedules", "orders", "calendar"}
 _DEFAULT_SECTIONS = "weather,time,schedules"
 
 
@@ -68,6 +68,29 @@ def _build_briefing_query(user_id: int) -> str:
         parts.append(f"{step}. Call list_amazon_orders to check recent and upcoming deliveries.")
         step += 1
 
+    if "calendar" in sections:
+        from bot.config import settings as _settings
+
+        has_personal = bool(_settings.ical_url)
+        has_business = bool(_settings.gsheet_calendar_url)
+        if has_personal or has_business:
+            sources_desc = " and ".join(
+                (["personal iCal"] if has_personal else [])
+                + (["business Google Sheet"] if has_business else [])
+            )
+            parts.append(
+                f"{step}. Call get_upcoming_calendar_events with days=7 and source='all' to fetch "
+                f"the user's upcoming {sources_desc} calendar events for the week ahead. "
+                "Present personal and business events under separate sub-headings."
+            )
+            step += 1
+        else:
+            parts.append(
+                f"{step}. (Calendar section requested but no calendar sources are configured — "
+                "omit the calendar section silently.)"
+            )
+            step += 1
+
     parts.append(
         f"\nAfter calling all the above tools, compile their results into a well-formatted daily briefing. "
         f"Use Markdown with clear section headings. Display times in the {tz} timezone. "
@@ -92,8 +115,8 @@ _CONFIGURE_BRIEFING_SCHEMA = {
             "type": "string",
             "description": (
                 "Comma-separated list of sections to include. "
-                "Valid values: weather, time, news, schedules, orders. "
-                "Example: 'weather,time,schedules'. Omit to leave unchanged."
+                "Valid values: weather, time, news, schedules, orders, calendar. "
+                "Example: 'weather,time,schedules,calendar'. Omit to leave unchanged."
             ),
         },
         "timezone": {
