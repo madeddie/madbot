@@ -88,18 +88,40 @@ def _get_business_events(days: int) -> list[tuple[datetime, str]]:
     for i, row in enumerate(csv.reader(io.StringIO(content))):
         if i == 0 or len(row) < 3:  # first row is empty header
             continue
-        _, title, start_str, *_ = row
+        _, title, start_str, *rest = row
         title = title.strip()
-        if not title or not start_str.strip():
+        start_str = start_str.strip()
+        if not title or not start_str:
             continue
+        end_str = rest[0].strip() if rest else ""
+
         try:
-            start_date = datetime.strptime(start_str.strip(), "%m/%d/%Y").date()
+            start_dt = datetime.strptime(start_str, "%m/%d/%Y %H:%M:%S").replace(tzinfo=timezone.utc)
+            if start_dt.date() < today or start_dt.date() > end_date:
+                continue
+            time_fmt = start_dt.strftime("%Y-%m-%d %H:%M")
+            if end_str:
+                try:
+                    end_dt = datetime.strptime(end_str, "%m/%d/%Y %H:%M:%S").replace(tzinfo=timezone.utc)
+                    if end_dt.date() == start_dt.date():
+                        fmt = f"- {title}: {time_fmt}–{end_dt.strftime('%H:%M')}"
+                    else:
+                        fmt = f"- {title}: {time_fmt}"
+                except ValueError:
+                    fmt = f"- {title}: {time_fmt}"
+            else:
+                fmt = f"- {title}: {time_fmt}"
         except ValueError:
-            continue
-        if start_date < today or start_date > end_date:
-            continue
-        start_dt = datetime(start_date.year, start_date.month, start_date.day, tzinfo=timezone.utc)
-        results.append((start_dt, f"- {title}: {start_date} (all day)"))
+            try:
+                start_date = datetime.strptime(start_str, "%m/%d/%Y").date()
+            except ValueError:
+                continue
+            if start_date < today or start_date > end_date:
+                continue
+            start_dt = datetime(start_date.year, start_date.month, start_date.day, tzinfo=timezone.utc)
+            fmt = f"- {title}: {start_date} (all day)"
+
+        results.append((start_dt, fmt))
 
     return sorted(results, key=lambda x: x[0])
 
