@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     amazon_password: str = ""
     amazon_otp_secret: str = ""
 
+    ollama_base_url: str = Field(default="http://localhost:11434/v1", description="Base URL for Ollama local API.")
+
     ical_url: str = Field(default="", description="Secret iCal URL for personal calendar access.")
     gsheet_calendar_id: str = Field(default="", description="Google Sheets spreadsheet ID for business calendar.")
 

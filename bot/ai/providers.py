@@ -91,6 +91,18 @@ def opencodezen(model_id: str):
     return _make_model(model_id, protocol, _OPENCODEZEN_BASE, settings.opencode_api_key)
 
 
+def ollama(model_id: str):
+    """
+    Return an ai_sdk model for a local Ollama server.
+
+    Ollama exposes an OpenAI-compatible API at http://localhost:11434/v1 by default.
+    Override the URL with OLLAMA_BASE_URL.
+
+    Usage: model = ollama("llama3.2")
+    """
+    return _make_model(model_id, Protocol.OPENAI_CHAT, settings.ollama_base_url, api_key="ollama")
+
+
 def get_default_model():
     """Instantiate the default model from AI_PROVIDER and AI_MODEL env vars."""
     provider = settings.ai_provider.lower()
@@ -100,6 +112,8 @@ def get_default_model():
         return opencodego(model_id)
     if provider == "opencodezen":
         return opencodezen(model_id)
+    if provider == "ollama":
+        return ollama(model_id)
     raise ValueError(
-        f"Unknown AI_PROVIDER {provider!r}. Use 'opencodego' or 'opencodezen'."
+        f"Unknown AI_PROVIDER {provider!r}. Use 'opencodego', 'opencodezen', or 'ollama'."
     )

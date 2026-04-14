@@ -109,7 +109,8 @@ All config lives in `bot/config.py` as a pydantic-settings `Settings` singleton.
 |---|---|---|---|
 | `TELEGRAM_BOT_TOKEN` | yes | — | Bot token from @BotFather |
 | `OPENCODE_API_KEY` | yes | — | API key for OpenCode endpoints |
-| `AI_PROVIDER` | no | `opencodego` | `opencodego` or `opencodezen` |
+| `AI_PROVIDER` | no | `opencodego` | `opencodego`, `opencodezen`, or `ollama` |
+| `OLLAMA_BASE_URL` | no | `http://localhost:11434/v1` | Base URL for Ollama local API (only used when `AI_PROVIDER=ollama`) |
 | `AI_MODEL` | no | `glm-5.1` | Model ID string |
 | `SYSTEM_PROMPT` | no | `""` | Base system instruction for AI |
 | `MAX_HISTORY_MESSAGES` | no | `20` | Per-user history limit (1–200) |
