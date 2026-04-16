@@ -31,6 +31,7 @@ def create_dispatcher() -> Dispatcher:
 
     # Fallback must be last — it catches all remaining F.text messages.
     from bot.handlers import fallback
+
     dp.include_router(fallback.router)
 
     return dp
@@ -56,13 +57,16 @@ async def _main() -> None:
     )
 
     from bot import db as _db_mod
+
     _db_mod.init()
 
     from bot import scheduler as _scheduler_mod
+
     _scheduler_mod.init(bot)
 
     from bot.ai import mcp_client as _mcp_mod
     from pathlib import Path
+
     await _mcp_mod.init(Path(settings.mcp_config_path))
 
     dp = create_dispatcher()
@@ -88,7 +92,10 @@ async def _main() -> None:
 
 
 def main() -> None:
-    asyncio.run(_main())
+    try:
+        asyncio.run(_main())
+    except KeyboardInterrupt:
+        pass
 
 
 if __name__ == "__main__":

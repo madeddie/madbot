@@ -21,6 +21,7 @@ Supports Claude Desktop-style JSON config (mcp_servers.json):
 Graceful degradation: if mcp_servers.json does not exist, or a server
 fails to connect, get_mcp_tools() returns only successfully loaded tools.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -193,7 +194,12 @@ async def shutdown() -> None:
             future = asyncio.run_coroutine_threadsafe(
                 _exit_stack.__aexit__(None, None, None), _bg_loop
             )
-            await asyncio.wrap_future(future)
+            future.result()
+        except RuntimeError as e:
+            if "Attempted to exit cancel scope" in str(e):
+                pass
+            else:
+                logger.exception("Error closing MCP sessions")
         except Exception:
             logger.exception("Error closing MCP sessions")
     if _bg_loop is not None:
