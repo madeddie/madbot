@@ -61,6 +61,10 @@ async def _main() -> None:
     from bot import scheduler as _scheduler_mod
     _scheduler_mod.init(bot)
 
+    from bot.ai import mcp_client as _mcp_mod
+    from pathlib import Path
+    await _mcp_mod.init(Path(settings.mcp_config_path))
+
     dp = create_dispatcher()
 
     logger.info(
@@ -79,6 +83,7 @@ async def _main() -> None:
         await dp.start_polling(bot, drop_pending_updates=True)
     finally:
         _scheduler_mod.get_scheduler().shutdown(wait=False)
+        await _mcp_mod.shutdown()
         await bot.session.close()
 
 
