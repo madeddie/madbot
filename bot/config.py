@@ -33,5 +33,7 @@ class Settings(BaseSettings):
     ical_url: str = Field(default="", description="Secret iCal URL for personal calendar access.")
     gsheet_calendar_id: str = Field(default="", description="Google Sheets spreadsheet ID for business calendar.")
 
+    mcp_config_path: str = Field(default="mcp_servers.json", description="Path to MCP servers config file (Claude Desktop format).")
+
 
 settings = Settings()

@@ -41,6 +41,8 @@ def _collect_tools_once() -> tuple[list[Tool], list]:
         for attr in dir(mod):
             if attr.startswith("make_") and attr.endswith("_tools") and callable(getattr(mod, attr)):
                 factories.append(getattr(mod, attr))
+    from bot.ai.mcp_client import get_mcp_tools
+    static.extend(get_mcp_tools())
     return static, factories
 
 
