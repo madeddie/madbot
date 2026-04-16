@@ -6,7 +6,7 @@ from aiogram.enums import ParseMode
 from aiogram.filters import Command
 from aiogram.types import Message
 from bot import db
-from bot.utils import md_to_tg
+from bot.utils import md_to_tg, typing_indicator
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -194,10 +194,10 @@ async def cmd_briefing(message: Message) -> None:
     from bot.ai.chat import one_shot  # late import — avoids circular at module level
 
     user_id = message.from_user.id
-    await message.bot.send_chat_action(chat_id=message.chat.id, action="typing")
     try:
         query = _build_briefing_query(user_id)
-        reply = await one_shot(user_id, query)
+        async with typing_indicator(message.bot, message.chat.id):
+            reply = await one_shot(user_id, query)
         await message.answer(md_to_tg(reply), parse_mode=ParseMode.MARKDOWN_V2)
     except Exception:
         logger.exception("Briefing failed for user %d", user_id)
