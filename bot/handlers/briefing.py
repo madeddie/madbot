@@ -16,7 +16,7 @@ COMMANDS = {"briefing": "Generate your personalised daily briefing"}
 _KEY_LOCATION = "briefing_location"
 _KEY_SECTIONS = "briefing_sections"
 _KEY_TIMEZONE = "briefing_timezone"
-_VALID_SECTIONS = {"weather", "time", "news", "schedules", "orders", "calendar"}
+_VALID_SECTIONS = {"weather", "time", "news", "schedules", "orders", "calendar", "email"}
 _DEFAULT_SECTIONS = "weather,time,schedules"
 
 
@@ -68,6 +68,16 @@ def _build_briefing_query(user_id: int) -> str:
         parts.append(f"{step}. Call list_amazon_orders to check recent and upcoming deliveries.")
         step += 1
 
+    if "email" in sections:
+        parts.append(
+            f"{step}. Use the Gmail MCP tools to fetch recent unread emails from the inbox "
+            "(e.g. call a list or search tool with query 'is:unread' or similar). "
+            "Summarise the most important or actionable messages in a concise Email section — "
+            "include sender, subject, and a one-line summary for each. "
+            "If there are no unread emails, say so briefly."
+        )
+        step += 1
+
     if "calendar" in sections:
         from bot.config import settings as _settings
 
@@ -115,7 +125,7 @@ _CONFIGURE_BRIEFING_SCHEMA = {
             "type": "string",
             "description": (
                 "Comma-separated list of sections to include. "
-                "Valid values: weather, time, news, schedules, orders, calendar. "
+                "Valid values: weather, time, news, schedules, orders, calendar, email. "
                 "Example: 'weather,time,schedules,calendar'. Omit to leave unchanged."
             ),
         },
