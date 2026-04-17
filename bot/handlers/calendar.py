@@ -19,7 +19,7 @@ from bot.utils import md_to_tg
 
 router = Router()
 
-COMMANDS = {"calendar": "Show upcoming calendar events — /calendar [days] [all|<calendar-name>]"}
+COMMANDS = {"calendar": "Show upcoming calendar events — /calendar [days] [all|NAME]"}
 
 _HTML_TAG_RE = re.compile(r"<[^>]+>")
 
