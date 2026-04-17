@@ -19,15 +19,15 @@ from bot.utils import md_to_tg
 
 router = Router()
 
-COMMANDS = {"calendar": "Show upcoming calendar events — /calendar [days] [personal|business|all]"}
+COMMANDS = {"calendar": "Show upcoming calendar events — /calendar [days] [all|<calendar-name>]"}
 
 _HTML_TAG_RE = re.compile(r"<[^>]+>")
 
 
-# ---- Personal calendar (iCal) ----
+# ---- Personal calendars (iCal) ----
 
-def _fetch_ical() -> Calendar:
-    req = Request(settings.ical_url, headers={"User-Agent": "madbot/1.0"})
+def _fetch_ical(url: str) -> Calendar:
+    req = Request(url, headers={"User-Agent": "madbot/1.0"})
     with urlopen(req, timeout=15) as resp:
         return Calendar.from_ical(resp.read())
 
@@ -52,8 +52,8 @@ def _format_ical_event(event) -> str:
     return f"- {summary}: {dtstart} (all day)"
 
 
-def _get_personal_events(days: int) -> list[tuple[datetime, str]]:
-    cal = _fetch_ical()
+def _get_ical_events(url: str, days: int) -> list[tuple[datetime, str]]:
+    cal = _fetch_ical(url)
     now = datetime.now(timezone.utc)
     events = recurring_ical_events.of(cal).between(now, now + timedelta(days=days))
     return sorted(
@@ -62,9 +62,9 @@ def _get_personal_events(days: int) -> list[tuple[datetime, str]]:
     )
 
 
-# ---- Business calendar (Google Sheet) ----
+# ---- Work calendar (Google Sheet) ----
 
-def _get_business_events(days: int) -> list[tuple[datetime, str]]:
+def _get_work_events(days: int) -> list[tuple[datetime, str]]:
     url = f"https://docs.google.com/spreadsheets/d/{settings.gsheet_calendar_id}/export?format=csv"
     req = Request(url, headers={"User-Agent": "madbot/1.0"})
     with urlopen(req, timeout=15) as resp:
@@ -119,56 +119,69 @@ def _get_business_events(days: int) -> list[tuple[datetime, str]]:
 # ---- Combined fetch ----
 
 def _get_upcoming_events(days: int = 7, source: str = "all") -> str:
-    has_personal = bool(settings.ical_url)
-    has_business = bool(settings.gsheet_calendar_id)
+    ical_calendars = settings.ical_calendars
+    has_work = bool(settings.gsheet_calendar_id)
 
-    if not has_personal and not has_business:
-        return "No calendar sources configured (set ICAL_URL and/or GSHEET_CALENDAR_ID)."
+    if not ical_calendars and not has_work:
+        return "No calendar sources configured (set ICAL_CALENDARS and/or GSHEET_CALENDAR_ID)."
 
-    want_personal = source in ("personal", "all") and has_personal
-    want_business = source in ("business", "all") and has_business
-
-    if not want_personal and not want_business:
-        available = []
-        if has_personal:
-            available.append("personal")
-        if has_business:
-            available.append("business")
+    if source == "all":
+        want_ical = dict(ical_calendars)
+        want_work = has_work
+    elif source == "work" and has_work and source not in ical_calendars:
+        want_ical = {}
+        want_work = True
+    elif source in ical_calendars:
+        want_ical = {source: ical_calendars[source]}
+        want_work = False
+    else:
+        available = list(ical_calendars.keys()) + (["work"] if has_work else []) + ["all"]
         return f"Source {source!r} not available. Available: {', '.join(available)}."
 
     errors: list[str] = []
-    personal_events: list[tuple[datetime, str]] = []
-    business_events: list[tuple[datetime, str]] = []
+    ical_results: dict[str, list[tuple[datetime, str]]] = {}
+    work_events: list[tuple[datetime, str]] = []
 
-    if want_personal:
+    for name, url in want_ical.items():
         try:
-            personal_events = _get_personal_events(days)
+            ical_results[name] = _get_ical_events(url, days)
         except (URLError, Exception) as e:
-            errors.append(f"Personal calendar error: {e}")
+            errors.append(f"{name!r} calendar error: {e}")
 
-    if want_business:
+    if want_work:
         try:
-            business_events = _get_business_events(days)
+            work_events = _get_work_events(days)
         except (URLError, Exception) as e:
-            errors.append(f"Business calendar error: {e}")
+            errors.append(f"Work calendar error: {e}")
 
     day_str = f"{days} day{'s' if days != 1 else ''}"
     lines: list[str] = []
 
-    if source == "all" and want_personal and want_business:
-        lines.append(f"**Calendar — next {day_str}:**")
-        lines.append("\n**Personal:**")
-        lines.extend(fmt for _, fmt in personal_events) if personal_events else lines.append("No events.")
-        lines.append("\n**Business:**")
-        lines.extend(fmt for _, fmt in business_events) if business_events else lines.append("No events.")
-    else:
-        label = "Personal" if source == "personal" else "Business"
-        lines.append(f"**{label} calendar — next {day_str}:**")
-        events = personal_events if want_personal else business_events
-        if events:
-            lines.extend(fmt for _, fmt in events)
+    total_sources = len(ical_results) + (1 if want_work else 0)
+
+    if total_sources == 1:
+        if want_work:
+            lines.append(f"**Work calendar — next {day_str}:**")
+            lines.extend(fmt for _, fmt in work_events) if work_events else lines.append(f"No events in the next {day_str}.")
         else:
-            lines.append(f"No events in the next {day_str}.")
+            name = next(iter(ical_results))
+            events = ical_results[name]
+            lines.append(f"**{name.capitalize()} calendar — next {day_str}:**")
+            lines.extend(fmt for _, fmt in events) if events else lines.append(f"No events in the next {day_str}.")
+    else:
+        lines.append(f"**Calendar — next {day_str}:**")
+        for name, events in ical_results.items():
+            lines.append(f"\n**{name.capitalize()}:**")
+            if events:
+                lines.extend(fmt for _, fmt in events)
+            else:
+                lines.append("No events.")
+        if want_work:
+            lines.append("\n**Work:**")
+            if work_events:
+                lines.extend(fmt for _, fmt in work_events)
+            else:
+                lines.append("No events.")
 
     if errors:
         lines.append("")
@@ -183,18 +196,25 @@ class _UpcomingParams(BaseModel):
     days: int = Field(default=7, ge=1, le=90, description="Days ahead to look (default 7, max 90).")
     source: str = Field(
         default="all",
-        description="Which calendar: 'personal' (iCal), 'business' (Google Sheet), or 'all' (both, default).",
+        description="Calendar name, 'work' (Google Sheet), or 'all' (default).",
+    )
+
+
+def _build_calendar_tool_description() -> str:
+    names = list(settings.ical_calendars.keys())
+    sources = names + (["work"] if settings.gsheet_calendar_id else []) + ["all"]
+    return (
+        "Get upcoming calendar events. "
+        f"source can be: {', '.join(repr(s) for s in sources)}. "
+        "'all' fetches every configured calendar. "
+        "Use when asked about schedule, appointments, meetings, or what's coming up."
     )
 
 
 AI_TOOLS = [
     ai_tool(
         name="get_upcoming_calendar_events",
-        description=(
-            "Get upcoming calendar events. source='personal' for the personal iCal calendar, "
-            "'business' for the business Google Sheet, 'all' for both (default). "
-            "Use when asked about schedule, appointments, meetings, or what's coming up."
-        ),
+        description=_build_calendar_tool_description(),
         parameters=_UpcomingParams,
         execute=_get_upcoming_events,
     ),
@@ -205,6 +225,9 @@ AI_TOOLS = [
 
 @router.message(Command("calendar"))
 async def cmd_calendar(message: Message) -> None:
+    has_work = bool(settings.gsheet_calendar_id)
+    valid_sources = set(settings.ical_calendars.keys()) | ({"work"} if has_work else set()) | {"all"}
+
     args = message.text.removeprefix("/calendar").strip().split()
     days = 7
     source = "all"
@@ -212,10 +235,11 @@ async def cmd_calendar(message: Message) -> None:
     for arg in args:
         if arg.isdigit():
             days = max(1, min(90, int(arg)))
-        elif arg.lower() in ("personal", "business", "all"):
+        elif arg.lower() in valid_sources:
             source = arg.lower()
         else:
-            await message.answer("Usage: /calendar [days] [personal|business|all]")
+            valid_str = "|".join(sorted(valid_sources))
+            await message.answer(f"Usage: /calendar [days] [{valid_str}]")
             return
 
     result = await asyncio.to_thread(_get_upcoming_events, days, source)

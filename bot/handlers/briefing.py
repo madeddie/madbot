@@ -81,17 +81,15 @@ def _build_briefing_query(user_id: int) -> str:
     if "calendar" in sections:
         from bot.config import settings as _settings
 
-        has_personal = bool(_settings.ical_url)
-        has_business = bool(_settings.gsheet_calendar_id)
-        if has_personal or has_business:
-            sources_desc = " and ".join(
-                (["personal iCal"] if has_personal else [])
-                + (["business Google Sheet"] if has_business else [])
-            )
+        ical_calendars = _settings.ical_calendars
+        has_work = bool(_settings.gsheet_calendar_id)
+        if ical_calendars or has_work:
+            source_names = list(ical_calendars.keys()) + (["work Google Sheet"] if has_work else [])
+            sources_desc = " and ".join(source_names)
             parts.append(
                 f"{step}. Call get_upcoming_calendar_events with days=7 and source='all' to fetch "
                 f"the user's upcoming {sources_desc} calendar events for the week ahead. "
-                "Present personal and business events under separate sub-headings."
+                "Present each calendar's events under a separate sub-heading."
             )
             step += 1
         else:
