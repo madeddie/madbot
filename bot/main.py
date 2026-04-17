@@ -9,6 +9,7 @@ import bot.handlers as _handlers_pkg
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from aiogram.types import BotCommand
 
 from bot.config import settings
 
@@ -78,6 +79,15 @@ async def _main() -> None:
     )
 
     async def _on_startup(bot: Bot, **kwargs) -> None:
+        commands: dict[str, str] = {}
+        for mod_info in pkgutil.iter_modules(_handlers_pkg.__path__):
+            mod = importlib.import_module(f"bot.handlers.{mod_info.name}")
+            if hasattr(mod, "COMMANDS"):
+                commands.update(mod.COMMANDS)
+        await bot.set_my_commands(
+            [BotCommand(command=cmd, description=desc) for cmd, desc in sorted(commands.items())]
+        )
+
         if settings.owner_chat_id:
             await bot.send_message(settings.owner_chat_id, "madbot is online.")
 
