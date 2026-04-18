@@ -124,8 +124,11 @@ async def run_scheduled_query(user_id: int, query: str) -> None:
         user_id,
         query,
         extra_system=(
-            "This is a scheduled message triggered automatically. "
-            "Respond naturally as if you initiated the conversation."
+            "IMPORTANT: This is an automated scheduled reminder being delivered now. "
+            "The message below is the reminder the user previously asked to receive. "
+            "Deliver it naturally and directly — do NOT schedule anything new, "
+            "do NOT ask for details, do NOT call any tools. "
+            "Simply notify the user about what they wanted to be reminded of."
         ),
     )
 
