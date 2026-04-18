@@ -19,12 +19,24 @@ COMMANDS = {"schedule": "Manage scheduled tasks — /schedule list | cancel &lt;
 # ---- Pydantic parameter models ----
 
 class _ScheduleOnceParams(BaseModel):
-    query: str = Field(description="The query or instruction to execute when the job fires.")
+    query: str = Field(
+        description=(
+            "The reminder message to deliver to the user when the job fires. "
+            "Write it as a direct, actionable reminder (e.g. 'Time to replace your wife\\'s medicine!'), "
+            "NOT as a scheduling request like 'Remind me to...'."
+        )
+    )
     delay_seconds: int = Field(description="How many seconds from now to run the job.", ge=1)
 
 
 class _ScheduleRecurringParams(BaseModel):
-    query: str = Field(description="The query or instruction to execute on each recurrence.")
+    query: str = Field(
+        description=(
+            "The reminder message to deliver to the user on each recurrence. "
+            "Write it as a direct, actionable reminder (e.g. 'Good morning! Here is today\\'s weather...'), "
+            "NOT as a scheduling request like 'Remind me to...'."
+        )
+    )
     cron_expression: str = Field(
         description="A standard 5-field cron expression, e.g. '0 9 * * *' for daily at 9 AM."
     )
