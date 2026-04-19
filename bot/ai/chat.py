@@ -7,7 +7,7 @@ from collections import defaultdict
 import bot.handlers as _handlers_pkg
 from ai_sdk import generate_text
 from ai_sdk.tool import Tool
-from ai_sdk.types import AnyMessage, CoreAssistantMessage, CoreUserMessage
+from ai_sdk.types import AnyMessage, CoreAssistantMessage, CoreUserMessage, ImagePart, TextPart
 
 from bot import db
 from bot.ai.providers import get_default_model
@@ -88,10 +88,20 @@ async def one_shot(user_id: int, query: str, extra_system: str = "") -> str:
     return result.text
 
 
-async def chat(user_id: int, user_message: str) -> str:
+async def chat(
+    user_id: int,
+    user_message: str,
+    image_bytes: bytes | None = None,
+    image_mime_type: str = "image/jpeg",
+) -> str:
     """Send a message and return the assistant reply, maintaining per-user history."""
-    logger.debug("chat: user=%d message=%r history_len=%d", user_id, user_message, len(_history[user_id]))
-    _history[user_id].append(CoreUserMessage(content=user_message))
+    logger.debug("chat: user=%d message=%r has_image=%s history_len=%d",
+                 user_id, user_message, image_bytes is not None, len(_history[user_id]))
+    if image_bytes is not None:
+        content: str | list = [TextPart(text=user_message), ImagePart(image=image_bytes, mime_type=image_mime_type)]
+    else:
+        content = user_message
+    _history[user_id].append(CoreUserMessage(content=content))
     _trim(user_id)
 
     result = await asyncio.to_thread(
