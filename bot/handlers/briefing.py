@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 from ai_sdk import tool as ai_tool
@@ -18,11 +19,31 @@ _KEY_SECTIONS = "briefing_sections"
 _KEY_TIMEZONE = "briefing_timezone"
 _VALID_SECTIONS = {"weather", "time", "news", "schedules", "orders", "calendar", "email"}
 _DEFAULT_SECTIONS = "weather,time,schedules"
+_MAX_MSG = 4096
+
+
+def _chunk(text: str) -> list[str]:
+    chunks: list[str] = []
+    current = ""
+    for paragraph in text.split("\n\n"):
+        candidate = (current + "\n\n" + paragraph).lstrip("\n") if current else paragraph
+        if len(candidate) <= _MAX_MSG:
+            current = candidate
+        else:
+            if current:
+                chunks.append(current)
+            while len(paragraph) > _MAX_MSG:
+                chunks.append(paragraph[:_MAX_MSG])
+                paragraph = paragraph[_MAX_MSG:]
+            current = paragraph
+    if current:
+        chunks.append(current)
+    return chunks
 
 
 # ---- Briefing query builder ----
 
-def _build_briefing_query(user_id: int) -> str:
+def _build_briefing_query(user_id: int, calendar_data: str | None = None) -> str:
     """Build a structured multi-tool prompt for the user's daily briefing."""
     facts = db.get_facts(user_id)
     location = facts.get(_KEY_LOCATION)
@@ -84,13 +105,20 @@ def _build_briefing_query(user_id: int) -> str:
         ical_calendars = _settings.ical_calendars
         has_work = bool(_settings.gsheet_calendar_id)
         if ical_calendars or has_work:
-            source_names = list(ical_calendars.keys()) + (["work Google Sheet"] if has_work else [])
-            sources_desc = " and ".join(source_names)
-            parts.append(
-                f"{step}. Call get_upcoming_calendar_events with days=7 and source='all' to fetch "
-                f"the user's upcoming {sources_desc} calendar events for the week ahead. "
-                "Present each calendar's events under a separate sub-heading."
-            )
+            if calendar_data is not None:
+                parts.append(
+                    f"{step}. Calendar events for the next 7 days (pre-fetched, do NOT call the calendar tool):\n"
+                    f"{calendar_data}\n"
+                    "Present each calendar's events under a separate sub-heading in the briefing."
+                )
+            else:
+                source_names = list(ical_calendars.keys()) + (["work Google Sheet"] if has_work else [])
+                sources_desc = " and ".join(source_names)
+                parts.append(
+                    f"{step}. Call get_upcoming_calendar_events with days=7 and source='all' to fetch "
+                    f"the user's upcoming {sources_desc} calendar events for the week ahead. "
+                    "Present each calendar's events under a separate sub-heading."
+                )
             step += 1
         else:
             parts.append(
@@ -200,13 +228,29 @@ def make_briefing_tools(user_id: int) -> list:
 @router.message(Command("briefing"))
 async def cmd_briefing(message: Message) -> None:
     from bot.ai.chat import one_shot  # late import — avoids circular at module level
+    from bot.handlers.calendar import _get_upcoming_events
 
     user_id = message.from_user.id
     try:
-        query = _build_briefing_query(user_id)
+        facts = db.get_facts(user_id)
+        sections_raw = facts.get(_KEY_SECTIONS, _DEFAULT_SECTIONS)
+        sections = [s.strip() for s in sections_raw.split(",") if s.strip()]
+
+        calendar_data: str | None = None
+        if "calendar" in sections:
+            from bot.config import settings as _settings
+            if _settings.ical_calendars or _settings.gsheet_calendar_id:
+                try:
+                    calendar_data = await asyncio.to_thread(_get_upcoming_events, 7, "all")
+                except Exception:
+                    logger.warning("Failed to pre-fetch calendar data for briefing", exc_info=True)
+
+        query = _build_briefing_query(user_id, calendar_data=calendar_data)
         async with typing_indicator(message.bot, message.chat.id):
             reply = await one_shot(user_id, query)
-        await message.answer(md_to_tg(reply), parse_mode=ParseMode.MARKDOWN_V2)
+        converted = md_to_tg(reply)
+        for chunk in _chunk(converted):
+            await message.answer(chunk, parse_mode=ParseMode.MARKDOWN_V2)
     except Exception:
         logger.exception("Briefing failed for user %d", user_id)
         await message.answer("Something went wrong generating your briefing. Please try again in a moment.")
