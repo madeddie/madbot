@@ -38,5 +38,7 @@ class Settings(BaseSettings):
 
     mcp_config_path: str = Field(default="mcp_servers.json", description="Path to MCP servers config file (Claude Desktop format).")
 
+    github_token: str = Field(default="", description="GitHub personal access token for starred repo release tracking.")
+
 
 settings = Settings()
