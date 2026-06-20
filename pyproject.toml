@@ -6,7 +6,7 @@ requires-python = "==3.12.*"
 dependencies = [
     "aiogram>=3.17,<4",
     "ai-sdk-python",
-    "pydantic-settings>=2.0",
+    "pydantic-settings>=2.14.2",
     "python-dotenv>=1.0",
     "apscheduler>=3.10",
     "sqlalchemy>=2.0",
