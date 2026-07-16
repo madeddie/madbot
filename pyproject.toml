@@ -15,7 +15,7 @@ dependencies = [
     "telegramify-markdown>=0.1",
     "icalendar>=6.0",
     "recurring-ical-events>=3.0",
-    "mcp>=1.0",
+    "mcp>=1.28.1",
 ]
 
 [project.scripts]
